@@ -127,11 +127,20 @@
     </LinearLayout>
 
     <Button
+        android:id="@+id/reset_scores"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:onClick="resetScores"
+        android:text="Reset"
+        android:textAllCaps="true" />
+
+    <Button
+        android:id="@+id/save_scores"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
-        android:onClick="resetScores"
-        android:text="Reset"
+        android:text="Save"
         android:textAllCaps="true" />
 </RelativeLayout>

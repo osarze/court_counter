@@ -1,70 +1,144 @@
 package com.example.android.courtcounter;
 
+import android.app.Dialog;
+import android.content.ContentUris;
+import android.content.ContentValues;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.CursorLoader;
+import android.support.v4.content.Loader;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
-public class MainActivity extends AppCompatActivity {
-    private int teamAScore = 0;
-    private int teamBScore = 0;
+import com.example.android.courtcounter.data.CounterContract.CounterEntry;
 
+public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor> {
+
+    private static final int COUNTER_LOADER = 0;
+
+    CounterCursorAdapter mCursorAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        displayForTeamA(teamAScore);
+        setContentView(R.layout.counter_list);
+
+        ListView scoresListView = findViewById(R.id.list);
+
+        // Find and set empty view on the ListView, so that it only shows when the list has 0 items
+        View emptyView = findViewById(R.id.empty_view);
+        scoresListView.setEmptyView(emptyView);
+
+        mCursorAdapter = new CounterCursorAdapter(this, null);
+        scoresListView.setAdapter(mCursorAdapter);
+
+        scoresListView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+            @Override
+            public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+                Uri currentCounterUri = ContentUris.withAppendedId(CounterEntry.CONTENT_URI, id);
+                confirmDialogue(id);
+                return true;
+            }
+        });
+        getSupportLoaderManager().initLoader(COUNTER_LOADER, null, this);
+
     }
 
-    public void displayForTeamA(int score){
-        TextView scoreView = (TextView) findViewById(R.id.team_a_score);
-        scoreView.setText(String.valueOf(score));
+    private void insertDummyData(){
+        ContentValues values = new ContentValues();
+        values.put(CounterEntry.COLUMN_TEAM_A_SCORE, 45);
+        values.put(CounterEntry.COLUMN_TEAM_B_SCORE, 3);
+        values.put(CounterEntry.COLUMN_DATE, 346789);
+
+        Uri newUri = getContentResolver().insert(CounterEntry.CONTENT_URI, values);
     }
 
-    public void displayForTeamB(int score){
-        TextView scoreView = (TextView) findViewById(R.id.team_b_score);
-        scoreView.setText(String.valueOf(score));
+    private void confirmDialogue(final long itemId){
+        AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(this);
+        alertDialogBuilder.setMessage(R.string.confirm_delete_text);
+
+        alertDialogBuilder.setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                Uri currentCounterUri = ContentUris.withAppendedId(CounterEntry.CONTENT_URI, itemId);
+                int rowsDeleted = getContentResolver().delete(currentCounterUri, null, null);
+
+                if(rowsDeleted > 0){
+                    Toast.makeText(MainActivity.this, getString(R.string.delete_success_text), Toast.LENGTH_SHORT).show();
+                }
+//                Toast.makeText(MainActivity.this, getString(R.string.delete_error_text), Toast.LENGTH_SHORT).show();
+
+            }
+        });
+
+        alertDialogBuilder.setNegativeButton("No", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                Toast.makeText(MainActivity.this, "Item Not Deleted", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        AlertDialog alertDialog = alertDialogBuilder.create();
+        alertDialog.show();
     }
 
-    /**
-     * Increase Point by 3
-     * @param v
-     */
-    public void addThreeForTeamA(View v){
-        teamAScore += 3;
-        displayForTeamA(teamAScore);
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu){
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+        return true;
     }
 
-    public void addTwoForTeamA(View v){
-        teamAScore += 2;
-        displayForTeamA(teamAScore);
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()){
+            case R.id.insert_dummy_data:
+                insertDummyData();
+                return true;
+
+            case R.id.new_score_counter:
+                Intent intent = new Intent(MainActivity.this, CounterActivity.class);
+                startActivity(intent);
+
+        }
+        return super.onOptionsItemSelected(item);
     }
 
-    public void addOneForTeamA(View v){
-        teamAScore += 1;
-        displayForTeamA(teamAScore);
+    public void deleteScores(View v ){
+        Log.i("ID ", String.valueOf(v.getId()));
     }
 
-    public void addThreeForTeamB(View v){
-        teamBScore += 3;
-        displayForTeamB(teamBScore);
+
+    @Override
+    public Loader<Cursor> onCreateLoader(int id, Bundle args) {
+        String[] projection = {
+                CounterEntry._ID,
+                CounterEntry.COLUMN_TEAM_A_SCORE,
+                CounterEntry.COLUMN_TEAM_B_SCORE,
+                CounterEntry.COLUMN_DATE
+        };
+        return new CursorLoader(this, CounterEntry.CONTENT_URI, projection, null, null, null);
     }
 
-    public void addTwoForTeamB(View v){
-        teamBScore += 2;
-        displayForTeamB(teamBScore);
+    @Override
+    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+        mCursorAdapter.swapCursor(data);
     }
 
-    public void addOneForTeamB(View v){
-        teamBScore += 1;
-        displayForTeamB(teamBScore);
-    }
-
-    public void resetScores(View v){
-        teamAScore = 0;
-        teamBScore = 0;
-        displayForTeamA(teamAScore);
-        displayForTeamB(teamAScore);
+    @Override
+    public void onLoaderReset(Loader<Cursor> loader) {
+        mCursorAdapter.swapCursor(null);
     }
 }
